@@ -4,9 +4,11 @@ const express = require("express");
 const cors = require("cors");
 const pool = require("./db");
 
+const authRoutes = require("./routes/auth.routes");
+
 const app = express();
-const PORT = process.env.PORT || 3000;
-const allowedOrigins = (process.env.FRONTEND_URL || "http://localhost:5173")
+const PORT = process.env.PORT;
+const allowedOrigins = (process.env.FRONTEND_URL)
   .split(",")
   .map((origin) => origin.trim())
   .filter(Boolean);
@@ -27,6 +29,7 @@ app.use(
 );
 
 app.use(express.json());
+app.use("/api/auth", authRoutes);
 
 async function startServer() {
   try {
@@ -38,9 +41,17 @@ async function startServer() {
       console.log(`Server chạy tại http://localhost:${PORT}`);
     });
   } catch (error) {
-    console.error("Kết nối database thất bại:", error.message);
+    console.error(
+      "Kết nối database thất bại:",
+      error.code || "UNKNOWN_ERROR",
+      error.message || "Không có thông tin lỗi.",
+    );
     process.exit(1);
   }
 }
 
-startServer();
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = app;
