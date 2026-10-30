@@ -5,6 +5,8 @@ const cors = require("cors");
 const pool = require("./db");
 
 const authRoutes = require("./routes/auth.routes");
+const cardRoutes = require("./routes/card.routes");
+const authMiddleware = require("./middlewares/auth.middleware");
 
 const app = express();
 const PORT = process.env.PORT;
@@ -30,6 +32,10 @@ app.use(
 
 app.use(express.json());
 app.use("/api/auth", authRoutes);
+
+// Các API được khai báo sau dòng này sẽ yêu cầu access token.
+app.use("/api", authMiddleware);
+app.use("/api/cards", cardRoutes);
 
 async function startServer() {
   try {

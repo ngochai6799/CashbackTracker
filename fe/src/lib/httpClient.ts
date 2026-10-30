@@ -1,9 +1,15 @@
 import axios, { type AxiosRequestConfig, type InternalAxiosRequestConfig } from 'axios'
+import router from '@/router'
+import {
+  clearAuthStorage,
+  getLocalStorageItem,
+  STORAGE_KEYS,
+} from '../utils/storage'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
 const API_TIMEOUT = Number(import.meta.env.VITE_API_TIMEOUT)
 const WITH_CREDENTIALS = import.meta.env.VITE_API_WITH_CREDENTIALS === 'true'
-export const ACCESS_TOKEN_KEY = 'access_token'
+let isRedirectingToAuth = false
 
 interface ApiErrorOptions {
   message: string
@@ -81,10 +87,23 @@ function normalizeError(error: unknown): ApiError {
   })
 }
 
+function isAuthRequest(url: string | null): boolean {
+  return Boolean(url && /\/api\/auth(?:\/|$)/.test(url))
+}
+
+function redirectToAuth(): void {
+  if (isRedirectingToAuth || router.currentRoute.value.name === 'auth') return
+
+  isRedirectingToAuth = true
+
+  void router.replace({ name: 'auth' }).finally(() => {
+    isRedirectingToAuth = false
+  })
+}
+
 apiClient.interceptors.request.use(
   (config) => {
-    const accessToken =
-      typeof window !== 'undefined' ? window.localStorage.getItem(ACCESS_TOKEN_KEY) : null
+    const accessToken = getLocalStorageItem(STORAGE_KEYS.accessToken)
 
     if (accessToken) {
       setHeader(config, 'Authorization', `Bearer ${accessToken}`)
@@ -100,8 +119,13 @@ apiClient.interceptors.response.use(
   (error: unknown) => {
     const apiError = normalizeError(error)
 
-    if (apiError.status === 401 && typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('api:unauthorized', { detail: apiError }))
+    if (
+      apiError.status === 401 &&
+      typeof window !== 'undefined' &&
+      !isAuthRequest(apiError.url)
+    ) {
+      clearAuthStorage()
+      redirectToAuth()
     }
 
     return Promise.reject(apiError)

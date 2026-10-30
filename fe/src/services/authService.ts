@@ -1,4 +1,9 @@
-import http, { ACCESS_TOKEN_KEY } from './httpClient'
+import http from '../lib/httpClient'
+import {
+  setLocalStorageItem,
+  setLocalStorageJson,
+  STORAGE_KEYS,
+} from '../utils/storage'
 
 export interface RegisterRequest {
   name: string
@@ -67,6 +72,6 @@ export async function loginAccount(payload: LoginRequest): Promise<LoginResponse
 }
 
 export function saveLoginSession(response: LoginResponse): void {
-  localStorage.setItem(ACCESS_TOKEN_KEY, response.data.accessToken)
-  localStorage.setItem('auth_user', JSON.stringify(response.data.user))
+  setLocalStorageItem(STORAGE_KEYS.accessToken, response.data.accessToken)
+  setLocalStorageJson(STORAGE_KEYS.authUser, response.data.user)
 }

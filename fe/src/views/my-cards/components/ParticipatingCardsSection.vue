@@ -3,15 +3,27 @@ import { ref } from 'vue'
 import Button from 'primevue/button'
 import Column from 'primevue/column'
 import DataTable from 'primevue/datatable'
-import ProgressBar from 'primevue/progressbar'
 import Tag from 'primevue/tag'
-import type { CashbackCard } from '../data/cashbackMock'
+import type { Card } from '@/services/cardService'
 
 defineProps<{
-  cards: CashbackCard[]
+  cards: Card[]
+  isLoading: boolean
+  error: string
+}>()
+
+const emit = defineEmits<{
+  retry: []
 }>()
 
 const expandedRows = ref<Record<number, boolean>>({})
+
+function formatCurrency(amount: number, currency: string): string {
+  return new Intl.NumberFormat('vi-VN', {
+    style: 'currency',
+    currency,
+  }).format(amount)
+}
 </script>
 
 <template>
@@ -21,13 +33,39 @@ const expandedRows = ref<Record<number, boolean>>({})
         <p class="mb-1 text-xs font-medium uppercase tracking-[0.14em] text-primary-600">Các thẻ đang theo dõi</p>
         <h1 class="text-2xl font-bold tracking-tight text-surface-950">Thẻ của tôi</h1>
         <p class="mt-2 text-sm text-surface-500">
-          Mỗi dòng là một thẻ. Mở rộng để xem các chiến dịch theo tháng đang còn mở.
+          Danh sách các thẻ thuộc tài khoản của bạn.
         </p>
       </div>
-      <Button label="Thêm thẻ" icon="pi pi-plus" text size="small" />
+      <Button label="Thêm thẻ" icon="pi pi-plus" text size="small" class="cursor-pointer" />
     </div>
 
-    <div class="overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm">
+    <div
+      v-if="isLoading"
+      class="flex min-h-52 items-center justify-center rounded-2xl border border-surface-200 bg-white text-sm text-surface-500 shadow-sm"
+    >
+      <i class="pi pi-spin pi-spinner mr-2" />
+      Đang tải danh sách thẻ...
+    </div>
+
+    <div
+      v-else-if="error"
+      class="flex min-h-52 flex-col items-center justify-center rounded-2xl border border-red-100 bg-red-50 px-6 text-center shadow-sm"
+    >
+      <i class="pi pi-exclamation-circle mb-3 text-xl text-red-500" />
+      <p class="text-sm text-red-600">{{ error }}</p>
+      <Button label="Thử lại" text size="small" class="mt-3 cursor-pointer" @click="emit('retry')" />
+    </div>
+
+    <div
+      v-else-if="!cards.length"
+      class="flex min-h-52 flex-col items-center justify-center rounded-2xl border border-dashed border-surface-300 bg-white px-6 text-center shadow-sm"
+    >
+      <i class="pi pi-credit-card mb-3 text-xl text-surface-400" />
+      <p class="text-sm font-medium text-surface-700">Bạn chưa có thẻ nào.</p>
+      <p class="mt-1 text-xs text-surface-500">Thêm thẻ đầu tiên để bắt đầu theo dõi cashback.</p>
+    </div>
+
+    <div v-else class="overflow-hidden rounded-2xl border border-surface-200 bg-white shadow-sm">
       <DataTable
         v-model:expanded-rows="expandedRows"
         :value="cards"
@@ -43,126 +81,54 @@ const expandedRows = ref<Record<number, boolean>>({})
         <Column header="Thẻ" style="min-width: 15rem">
           <template #body="{ data }">
             <div>
-              <p class="font-semibold text-surface-900">{{ data.card }}</p>
-              <p class="mt-1 text-xs text-surface-500">{{ data.bank }}</p>
+              <p class="font-semibold text-surface-900">{{ data.cardName }}</p>
+              <p class="mt-1 text-xs text-surface-500">
+                {{ data.issuer }}<span v-if="data.lastFour"> · •••• {{ data.lastFour }}</span>
+              </p>
             </div>
           </template>
         </Column>
 
         <Column header="Chương trình chính" style="min-width: 20rem">
-          <template #body="{ data }">
-            <p class="font-semibold text-surface-800">{{ data.mainProgram.name }}</p>
-            <p class="mt-1 text-xs leading-5 text-surface-500">{{ data.mainProgram.description }}</p>
-            <p class="mt-2 text-xs font-semibold text-primary-600">{{ data.mainProgram.reward }}</p>
+          <template #body>
+            <p class="text-sm text-surface-400">Chưa có dữ liệu chương trình</p>
+            <p class="mt-1 text-xs text-surface-400">Sẽ được kết nối ở bước tiếp theo</p>
           </template>
         </Column>
 
         <Column header="Chiến dịch tháng" style="min-width: 15rem">
-          <template #body="{ data }">
-            <template v-if="data.monthlyCampaigns[0]">
-              <span class="font-semibold text-surface-800">{{ data.monthlyCampaigns.length }} chiến dịch mở</span>
-              <div class="mt-2 flex items-center gap-2">
-                <Tag :value="data.monthlyCampaigns[0].status" :severity="data.monthlyCampaigns[0].statusSeverity" rounded />
-                <span class="text-xs text-surface-500">{{ data.monthlyCampaigns[0].period }}</span>
-              </div>
-            </template>
-            <span v-else class="text-xs text-surface-400">Không có chiến dịch tháng đang mở</span>
+          <template #body>
+            <p class="text-sm text-surface-400">Chưa có campaign</p>
+            <p class="mt-1 text-xs text-surface-400">Chưa có dữ liệu để theo dõi</p>
           </template>
         </Column>
 
         <Column header="Phí thường niên" style="min-width: 11rem; width: 11rem">
           <template #body="{ data }">
             <div class="text-surface-500">
-              <p class="text-xs font-semibold text-surface-700">{{ data.annualFee.amount }}</p>
-              <Tag :value="data.annualFee.status" :severity="data.annualFee.statusSeverity" rounded class="mt-1 !text-[10px]" />
-              <p class="mt-1 text-[10px]">Hoàn phí năm sau</p>
+              <p class="text-xs font-semibold text-surface-700">{{ formatCurrency(data.annualFee, data.currency) }}</p>
+              <Tag
+                :value="data.isActive ? 'Đang hoạt động' : 'Đã tắt'"
+                :severity="data.isActive ? 'success' : 'secondary'"
+                rounded
+                class="mt-1 !text-[10px]"
+              />
             </div>
           </template>
         </Column>
 
         <Column header="Chi tiêu năm" style="min-width: 14rem; width: 14rem">
-          <template #body="{ data }">
-            <div class="mb-1 flex items-center justify-between gap-2 text-[11px] text-surface-500">
-              <span>{{ data.annualFee.spent }}</span>
-              <span class="font-semibold text-surface-600">{{ data.annualFee.progress }}%</span>
-            </div>
-            <ProgressBar :value="data.annualFee.progress" :show-value="false" class="h-1" />
-            <p class="mt-1 line-clamp-2 text-[10px] leading-4 text-surface-400">{{ data.annualFee.next }}</p>
+          <template #body>
+            <p class="text-xs text-surface-400">Chưa có dữ liệu chi tiêu</p>
+            <p class="mt-1 text-[10px] leading-4 text-surface-400">Tiến độ sẽ lấy từ campaign</p>
           </template>
         </Column>
 
-        <template #expansion="{ data }">
-          <div class="space-y-4 bg-surface-50/70 p-5">
-            <div class="flex flex-col justify-between gap-2 sm:flex-row sm:items-center">
-              <div>
-                <p class="text-xs font-semibold uppercase tracking-wide text-surface-400">Chiến dịch theo tháng</p>
-                <p class="mt-1 text-sm text-surface-600">
-                  Chỉ hiển thị các kỳ tháng chưa hoàn thành hoặc chưa nhận cashback.
-                </p>
-              </div>
-              <span class="text-xs font-medium text-surface-500">{{ data.monthlyCampaigns.length }} kỳ đang mở</span>
-            </div>
-
-            <div v-if="data.monthlyCampaigns.length" class="space-y-4">
-              <article
-                v-for="campaign in data.monthlyCampaigns"
-                :key="campaign.id"
-                class="rounded-xl border border-surface-200 bg-white p-4 shadow-sm"
-              >
-                <div class="flex flex-col justify-between gap-3 lg:flex-row lg:items-start">
-                  <div>
-                    <div class="flex flex-wrap items-center gap-2">
-                      <h3 class="text-base font-bold text-surface-900">{{ campaign.period }}</h3>
-                      <Tag :value="campaign.status" :severity="campaign.statusSeverity" rounded />
-                    </div>
-                    <p class="mt-1 text-xs text-surface-500">{{ campaign.dateRange }} · {{ campaign.step }}</p>
-                  </div>
-                  <div class="lg:min-w-72">
-                    <div class="mb-1 flex items-center justify-between text-xs">
-                      <span class="text-surface-500">Tiến độ</span>
-                      <span class="font-semibold text-primary-600">{{ campaign.progress }}%</span>
-                    </div>
-                    <ProgressBar :value="campaign.progress" :show-value="false" class="h-1.5" />
-                    <p class="mt-2 text-right text-xs text-surface-500">{{ campaign.spent }}</p>
-                  </div>
-                </div>
-
-                <div class="mt-5 grid gap-5 border-t border-surface-100 pt-4 lg:grid-cols-[1.1fr_1fr_0.8fr]">
-                  <div>
-                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-400">Điều kiện</p>
-                    <div class="space-y-3">
-                      <div v-for="condition in campaign.conditions" :key="condition.name">
-                        <div class="mb-1 flex items-center justify-between gap-3 text-xs">
-                          <span class="font-medium text-surface-700">{{ condition.name }}</span>
-                          <span class="text-surface-500">{{ condition.detail }}</span>
-                        </div>
-                        <ProgressBar :value="condition.progress" :show-value="false" class="h-1.5" />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-400">Task trong kỳ</p>
-                    <div class="space-y-2">
-                      <div v-for="task in campaign.tasks" :key="task.name" class="flex items-center justify-between gap-3">
-                        <span class="text-xs text-surface-700">{{ task.name }}</span>
-                        <Tag :value="task.status" :severity="task.severity" rounded />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <p class="mb-3 text-xs font-semibold uppercase tracking-wide text-surface-400">Cashback</p>
-                    <p class="text-lg font-bold text-surface-900">{{ campaign.cashback }}</p>
-                    <Tag :value="campaign.cashbackStatus" :severity="campaign.cashbackSeverity" rounded class="mt-2" />
-                    <p class="mt-3 text-xs leading-5 text-surface-600">Tiếp theo: {{ campaign.next }}</p>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <p v-else class="rounded-xl border border-dashed border-surface-300 bg-white p-6 text-center text-sm text-surface-500">
-              Không còn chiến dịch theo tháng chưa hoàn thành.
+        <template #expansion>
+          <div class="bg-surface-50/70 p-5">
+            <p class="text-xs font-semibold uppercase tracking-wide text-surface-400">Chiến dịch theo tháng</p>
+            <p class="mt-2 text-sm text-surface-500">
+              Chưa có dữ liệu campaign cho thẻ này.
             </p>
           </div>
         </template>
